@@ -23,9 +23,22 @@ const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize }: GameGridPro
   };
 
   const playIncorrectSound = () => {
-    const audio = new Audio('data:audio/wav;base64,UklGRlQGAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAGAAD//////0U//nIqgU//V33/gk//Lv///wAAABqAAE5aAGxjAG5OAGF8AIOVAJKWAKtmAL13AKSS//8AAAT/7gD+//r/BgD5/+YA/v////8CAAcA+QDm//r//wAEAAIA/gD1//b//P8GAAQA9v////w+Af//Af8E/wH/A/8F/wP/AP8E/wP/BP8A/wT/A/8F/wD//f8F/wP/BP/////+/wX/A/8E////AP8E/wP/BP////8A/wT/A/8E/////wD/BP8D/wT////+/wX/A/8E/////wD/BP8D/wT////+/wX/A/8E/////wD/BP8D/wT////+/wX/A/8E/////wD/BP8D/wT////')
-    audio.volume = 0.2;
-    audio.play().catch(() => {});
+    // Create a more noticeable error sound using Web Audio API
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.3);
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
   };
 
   const handleCellClick = (cellIndex: number) => {

@@ -5,7 +5,7 @@ import GameTimer from './GameTimer';
 import ScoreDisplay from './ScoreDisplay';
 import GameStartScreen from './GameStartScreen';
 import GameResultScreen from './GameResultScreen';
-import DifficultySelectionScreen, { Difficulty } from './DifficultySelectionScreen';
+import DifficultySelectionScreen, { Difficulty, GameDuration } from './DifficultySelectionScreen';
 import GameControls from './GameControls';
 
 type GameState = 'difficulty' | 'start' | 'playing' | 'finished';
@@ -13,13 +13,12 @@ type GameState = 'difficulty' | 'start' | 'playing' | 'finished';
 const TargetRushGame = () => {
   const [gameState, setGameState] = useState<GameState>('difficulty');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
+  const [gameDuration, setGameDuration] = useState<GameDuration>(120);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(120); // 2 minutes
+  const [timeLeft, setTimeLeft] = useState(120);
   const [activeCell, setActiveCell] = useState(0);
   const [lastCell, setLastCell] = useState(-1);
   const [showScoreAnimation, setShowScoreAnimation] = useState(false);
-
-  const GAME_DURATION = 120; // 2 minutes
 
   // Get grid size based on difficulty
   const getGridSize = (diff: Difficulty) => {
@@ -45,9 +44,11 @@ const TargetRushGame = () => {
     setActiveCell(newCell);
   }, [activeCell, lastCell, totalCells]);
 
-  // Handle difficulty selection
-  const handleDifficultySelect = (selectedDifficulty: Difficulty) => {
+  // Handle difficulty and duration selection
+  const handleDifficultySelect = (selectedDifficulty: Difficulty, selectedDuration: GameDuration) => {
     setDifficulty(selectedDifficulty);
+    setGameDuration(selectedDuration);
+    setTimeLeft(selectedDuration);
     setGameState('start');
   };
 
@@ -55,7 +56,7 @@ const TargetRushGame = () => {
   const startGame = () => {
     setGameState('playing');
     setScore(0);
-    setTimeLeft(GAME_DURATION);
+    setTimeLeft(gameDuration);
     setLastCell(-1);
     generateNewCell();
   };
@@ -75,7 +76,7 @@ const TargetRushGame = () => {
   // Restart game (stay in same difficulty)
   const restartGame = () => {
     setScore(0);
-    setTimeLeft(GAME_DURATION);
+    setTimeLeft(gameDuration);
     setActiveCell(0);
     setLastCell(-1);
     startGame();
@@ -85,7 +86,7 @@ const TargetRushGame = () => {
   const quitGame = () => {
     setGameState('difficulty');
     setScore(0);
-    setTimeLeft(GAME_DURATION);
+    setTimeLeft(gameDuration);
     setActiveCell(0);
     setLastCell(-1);
   };
@@ -94,7 +95,7 @@ const TargetRushGame = () => {
   const resetToStart = () => {
     setGameState('difficulty');
     setScore(0);
-    setTimeLeft(GAME_DURATION);
+    setTimeLeft(gameDuration);
     setActiveCell(0);
     setLastCell(-1);
   };
@@ -112,8 +113,14 @@ const TargetRushGame = () => {
   }, [gameState, timeLeft]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-violet-100 via-sky-50 to-emerald-50 p-4 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-4 -left-4 w-72 h-72 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full opacity-20 animate-pulse"></div>
+        <div className="absolute top-1/3 -right-16 w-96 h-96 bg-gradient-to-r from-pink-300 to-orange-300 rounded-full opacity-15 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-teal-300 rounded-full opacity-20 animate-pulse" style={{ animationDelay: '2s' }}></div>
+      </div>
+      <div className="max-w-4xl mx-auto relative z-10">
         {gameState === 'difficulty' && (
           <DifficultySelectionScreen onSelect={handleDifficultySelect} />
         )}
@@ -124,7 +131,7 @@ const TargetRushGame = () => {
         
         {gameState === 'playing' && (
           <div className="text-center">
-            <GameTimer timeLeft={timeLeft} totalTime={GAME_DURATION} />
+            <GameTimer timeLeft={timeLeft} totalTime={gameDuration} />
             <ScoreDisplay score={score} showAnimation={showScoreAnimation} />
             <GameGrid 
               activeCell={activeCell}
@@ -137,7 +144,7 @@ const TargetRushGame = () => {
               Click the target 🎯 as fast as you can!
             </div>
             <div className="text-sm text-gray-500 mt-1">
-              Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} ({gridSize}×{gridSize})
+              Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} ({gridSize}×{gridSize}) • Duration: {gameDuration}s
             </div>
           </div>
         )}
