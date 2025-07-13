@@ -2,17 +2,19 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Zap, Target, Flame } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type GameDuration = 30 | 60 | 120;
 
 interface DifficultySelectionScreenProps {
-  onSelect: (difficulty: Difficulty, duration: GameDuration) => void;
+  onSelect: (difficulty: Difficulty, duration: GameDuration, variableTarget: boolean) => void;
 }
 
 const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps) => {
   const [selectedDifficulty, setSelectedDifficulty] = React.useState<Difficulty | null>(null);
   const [selectedDuration, setSelectedDuration] = React.useState<GameDuration | null>(null);
+  const [variableTarget, setVariableTarget] = React.useState(false);
 
   const difficulties = [
     {
@@ -49,7 +51,7 @@ const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps)
 
   const handleStart = () => {
     if (selectedDifficulty && selectedDuration) {
-      onSelect(selectedDifficulty, selectedDuration);
+      onSelect(selectedDifficulty, selectedDuration, variableTarget);
     }
   };
 
@@ -122,6 +124,12 @@ const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps)
               );
             })}
           </div>
+        </div>
+
+        {/* Variable Target Toggle */}
+        <div className="flex justify-center items-center gap-2 mt-6">
+          <Switch checked={variableTarget} onCheckedChange={setVariableTarget} id="variable-target-switch" />
+          <label htmlFor="variable-target-switch" className="text-gray-700 text-lg select-none cursor-pointer">Variable Target Size</label>
         </div>
 
         {/* Start Button */}

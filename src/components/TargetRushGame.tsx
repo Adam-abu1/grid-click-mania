@@ -7,6 +7,19 @@ import GameStartScreen from './GameStartScreen';
 import GameResultScreen from './GameResultScreen';
 import DifficultySelectionScreen, { Difficulty, GameDuration } from './DifficultySelectionScreen';
 import GameControls from './GameControls';
+import { Button } from '@/components/ui/button';
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 
 type GameState = 'difficulty' | 'start' | 'playing' | 'finished';
 
@@ -15,10 +28,19 @@ const TargetRushGame = () => {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [gameDuration, setGameDuration] = useState<GameDuration>(120);
   const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [bonusMessage, setBonusMessage] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(120);
   const [activeCell, setActiveCell] = useState(0);
   const [lastCell, setLastCell] = useState(-1);
   const [showScoreAnimation, setShowScoreAnimation] = useState(false);
+  const [variableTarget, setVariableTarget] = useState(false);
+  const [targetSize, setTargetSize] = useState<number>(48); // px, default size
+  const [paused, setPaused] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'restart' | 'quit' | null>(null);
+  const [wasPausedBeforeDialog, setWasPausedBeforeDialog] = useState(false);
 
   // Get grid size based on difficulty
   const getGridSize = (diff: Difficulty) => {
@@ -42,13 +64,20 @@ const TargetRushGame = () => {
     
     setLastCell(activeCell);
     setActiveCell(newCell);
-  }, [activeCell, lastCell, totalCells]);
+    if (variableTarget) {
+      // Random size between 32px and 64px
+      setTargetSize(32 + Math.floor(Math.random() * 33));
+    } else {
+      setTargetSize(48);
+    }
+  }, [activeCell, lastCell, totalCells, variableTarget]);
 
   // Handle difficulty and duration selection
-  const handleDifficultySelect = (selectedDifficulty: Difficulty, selectedDuration: GameDuration) => {
+  const handleDifficultySelect = (selectedDifficulty: Difficulty, selectedDuration: GameDuration, selectedVariableTarget: boolean) => {
     setDifficulty(selectedDifficulty);
     setGameDuration(selectedDuration);
     setTimeLeft(selectedDuration);
+    setVariableTarget(selectedVariableTarget);
     setGameState('start');
   };
 
@@ -56,6 +85,8 @@ const TargetRushGame = () => {
   const startGame = () => {
     setGameState('playing');
     setScore(0);
+    setCombo(0);
+    setMaxCombo(0);
     setTimeLeft(gameDuration);
     setLastCell(-1);
     generateNewCell();
@@ -66,19 +97,39 @@ const TargetRushGame = () => {
     if (gameState !== 'playing') return;
     
     if (cellIndex === activeCell) {
-      setScore(prev => prev + 1);
+      setScore(prev => {
+        // Award bonus for every 5 streak
+        const newCombo = combo + 1;
+        let bonus = 0;
+        if (newCombo > 0 && newCombo % 5 === 0) {
+          bonus = 2; // Example: +2 bonus every 5 streak
+          setBonusMessage(`Combo x${newCombo}! +${bonus} bonus!`);
+          setTimeout(() => setBonusMessage(null), 1200);
+        }
+        return prev + 1 + bonus;
+      });
+      setCombo(prev => {
+        const newCombo = prev + 1;
+        setMaxCombo(max => (newCombo > max ? newCombo : max));
+        return newCombo;
+      });
       setShowScoreAnimation(true);
       setTimeout(() => setShowScoreAnimation(false), 300);
       generateNewCell();
+    } else {
+      setCombo(0); // Reset combo on miss
     }
   };
 
   // Restart game (stay in same difficulty)
   const restartGame = () => {
     setScore(0);
+    setCombo(0);
+    setMaxCombo(0);
     setTimeLeft(gameDuration);
     setActiveCell(0);
     setLastCell(-1);
+    setPaused(false);
     startGame();
   };
 
@@ -86,23 +137,56 @@ const TargetRushGame = () => {
   const quitGame = () => {
     setGameState('difficulty');
     setScore(0);
+    setCombo(0);
+    setMaxCombo(0);
     setTimeLeft(gameDuration);
     setActiveCell(0);
     setLastCell(-1);
+    setPaused(false);
   };
 
   // Reset to difficulty selection
   const resetToStart = () => {
     setGameState('difficulty');
     setScore(0);
+    setCombo(0);
+    setMaxCombo(0);
     setTimeLeft(gameDuration);
     setActiveCell(0);
     setLastCell(-1);
+    setPaused(false);
+  };
+
+  // Intercepted handlers
+  const handleRestart = () => {
+    setWasPausedBeforeDialog(paused);
+    setPaused(true);
+    setPendingAction('restart');
+    setConfirmOpen(true);
+  };
+  const handleQuit = () => {
+    setWasPausedBeforeDialog(paused);
+    setPaused(true);
+    setPendingAction('quit');
+    setConfirmOpen(true);
+  };
+  const handleConfirm = () => {
+    setConfirmOpen(false);
+    if (pendingAction === 'restart') restartGame();
+    if (pendingAction === 'quit') quitGame();
+    setPendingAction(null);
+    setWasPausedBeforeDialog(false);
+  };
+  const handleCancel = () => {
+    setConfirmOpen(false);
+    setPendingAction(null);
+    setPaused(wasPausedBeforeDialog);
+    setWasPausedBeforeDialog(false);
   };
 
   // Game timer
   useEffect(() => {
-    if (gameState === 'playing' && timeLeft > 0) {
+    if (gameState === 'playing' && timeLeft > 0 && !paused) {
       const timer = setTimeout(() => {
         setTimeLeft(prev => prev - 1);
       }, 1000);
@@ -110,7 +194,7 @@ const TargetRushGame = () => {
     } else if (timeLeft === 0 && gameState === 'playing') {
       setGameState('finished');
     }
-  }, [gameState, timeLeft]);
+  }, [gameState, timeLeft, paused]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-100 via-sky-50 to-emerald-50 p-4 relative overflow-hidden">
@@ -130,23 +214,91 @@ const TargetRushGame = () => {
         )}
         
         {gameState === 'playing' && (
-          <div className="text-center">
-            <GameTimer timeLeft={timeLeft} totalTime={gameDuration} />
-            <ScoreDisplay score={score} showAnimation={showScoreAnimation} />
-            <GameGrid 
-              activeCell={activeCell}
-              onCellClick={handleCellClick}
-              gameActive={true}
-              gridSize={gridSize}
-            />
-            <GameControls onRestart={restartGame} onQuit={quitGame} />
-            <div className="mt-4 text-lg text-gray-600 font-medium">
-              Click the target 🎯 as fast as you can!
+          <>
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {pendingAction === 'restart' ? 'Restart Game?' : 'Quit Game?'}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {pendingAction === 'restart'
+                      ? 'Are you sure you want to restart? Your current progress will be lost.'
+                      : 'Are you sure you want to quit? Your current progress will be lost.'}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={handleCancel}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirm}>Yes</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <div className="flex flex-col items-center w-full">
+              <GameTimer timeLeft={timeLeft} totalTime={gameDuration} />
+              <div className="flex flex-row justify-center items-start w-full max-w-4xl mx-auto">
+                <div className="flex-1 flex flex-col items-center relative">
+                  <ScoreDisplay score={score} showAnimation={showScoreAnimation} />
+                  <div className="relative w-full">
+                    <GameGrid 
+                      activeCell={activeCell}
+                      onCellClick={handleCellClick}
+                      gameActive={!paused}
+                      gridSize={gridSize}
+                      variableTarget={variableTarget}
+                      targetSize={targetSize}
+                    />
+                    {paused && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-20 rounded-2xl">
+                        <span className="text-4xl font-bold text-gray-700">Paused</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col items-start" style={{ width: '200px', minWidth: '160px', maxWidth: '220px' }}>
+                  {/* Combo/Streak Counter */}
+                  <div style={{ minHeight: '2.5rem' }} className="w-full">
+                    {combo > 1 ? (
+                      <div className="text-xl font-bold text-yellow-500 animate-pulse text-right w-full">Combo x{combo}</div>
+                    ) : (
+                      <div className="invisible text-xl font-bold text-right w-full">Combo x0</div>
+                    )}
+                  </div>
+                  {/* Bonus Message */}
+                  <div style={{ minHeight: '2.5rem' }} className="w-full">
+                    {bonusMessage ? (
+                      <div className="text-lg font-bold text-orange-500 animate-bounce text-right w-full">{bonusMessage}</div>
+                    ) : (
+                      <div className="invisible text-lg font-bold text-right w-full">Bonus</div>
+                    )}
+                  </div>
+                  {/* Max Combo */}
+                  <div style={{ minHeight: '1.5rem' }} className="w-full">
+                    {maxCombo > 1 ? (
+                      <div className="text-sm text-gray-500 text-right w-full">Max Combo: {maxCombo}</div>
+                    ) : (
+                      <div className="invisible text-sm text-right w-full">Max Combo: 0</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-center space-x-4 mt-6">
+                <Button
+                  onClick={() => setPaused(p => !p)}
+                  variant="outline"
+                  className="bg-yellow-50 hover:bg-yellow-100 border-yellow-300 text-yellow-700 hover:text-yellow-800"
+                >
+                  {paused ? 'Resume' : 'Pause'}
+                </Button>
+                <GameControls onRestart={handleRestart} onQuit={handleQuit} />
+              </div>
+              <div className="mt-4 text-lg text-gray-600 font-medium">
+                Click the target 🎯 as fast as you can!
+              </div>
+              <div className="text-sm text-gray-500 mt-1">
+                Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} ({gridSize}×{gridSize}) • Duration: {gameDuration}s
+              </div>
             </div>
-            <div className="text-sm text-gray-500 mt-1">
-              Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} ({gridSize}×{gridSize}) • Duration: {gameDuration}s
-            </div>
-          </div>
+          </>
         )}
         
         {gameState === 'finished' && (

@@ -7,9 +7,11 @@ interface GameGridProps {
   onCellClick: (cellIndex: number) => void;
   gameActive: boolean;
   gridSize: number;
+  variableTarget?: boolean;
+  targetSize?: number;
 }
 
-const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize }: GameGridProps) => {
+const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize, variableTarget = false, targetSize = 48 }: GameGridProps) => {
   const [feedbackCell, setFeedbackCell] = useState<number | null>(null);
   const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null);
 
@@ -17,7 +19,7 @@ const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize }: GameGridPro
 
   // Create audio elements
   const playCorrectSound = () => {
-    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiQ1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiQ1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBQ==');
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiR1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiQ1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBjiQ1fLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEVBQ==');
     audio.volume = 0.3;
     audio.play().catch(() => {});
   };
@@ -90,7 +92,7 @@ const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize }: GameGridPro
           onClick={() => handleCellClick(cellIndex)}
           disabled={!gameActive}
           className={cn(
-            "aspect-square rounded-2xl border-4 transition-all duration-200 transform",
+            "aspect-square w-full h-full min-w-[110px] min-h-[110px] md:min-w-[140px] md:min-h-[140px] rounded-2xl border-4 transition-all duration-200 transform flex items-center justify-center",
             "hover:scale-105 active:scale-95",
             "text-2xl font-bold shadow-lg",
             // Base styling
@@ -104,7 +106,12 @@ const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize }: GameGridPro
           )}
         >
           {activeCell === cellIndex && (
-            <div className="text-4xl">🎯</div>
+            <span
+              className="block mx-auto"
+              style={variableTarget ? { fontSize: `${targetSize * 0.7}px`, transition: 'font-size 0.2s' } : {}}
+            >
+              🎯
+            </span>
           )}
         </button>
       ))}
