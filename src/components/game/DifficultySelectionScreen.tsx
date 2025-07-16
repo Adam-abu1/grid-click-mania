@@ -3,6 +3,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Zap, Target, Flame } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useGameModifiers } from './GameModifiersContext';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type GameDuration = 30 | 60 | 120;
@@ -14,7 +16,9 @@ interface DifficultySelectionScreenProps {
 const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps) => {
   const [selectedDifficulty, setSelectedDifficulty] = React.useState<Difficulty | null>(null);
   const [selectedDuration, setSelectedDuration] = React.useState<GameDuration | null>(null);
-  const [variableTarget, setVariableTarget] = React.useState(false);
+  // Remove local variableTarget state
+  const { modifiers, setModifiers } = useGameModifiers();
+  const [modifiersOpen, setModifiersOpen] = React.useState(false);
 
   const difficulties = [
     {
@@ -51,7 +55,7 @@ const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps)
 
   const handleStart = () => {
     if (selectedDifficulty && selectedDuration) {
-      onSelect(selectedDifficulty, selectedDuration, variableTarget);
+      onSelect(selectedDifficulty, selectedDuration, modifiers.variableTarget);
     }
   };
 
@@ -126,12 +130,50 @@ const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps)
           </div>
         </div>
 
-        {/* Variable Target Toggle */}
-        <div className="flex justify-center items-center gap-2 mt-6">
-          <Switch checked={variableTarget} onCheckedChange={setVariableTarget} id="variable-target-switch" />
-          <label htmlFor="variable-target-switch" className="text-gray-700 text-lg select-none cursor-pointer">Variable Target Size</label>
+        {/* Modifiers Button */}
+        <div className="flex justify-center items-center gap-4 mt-6">
+          <Dialog open={modifiersOpen} onOpenChange={setModifiersOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-blue-400 text-blue-700 hover:bg-blue-50" type="button">
+                Game Modifiers
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Game Modifiers</DialogTitle>
+                <DialogDescription>
+                  Customize gameplay with optional modifiers. More coming soon!
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-4 mt-4">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={modifiers.variableTarget}
+                    onCheckedChange={v => setModifiers(m => ({ ...m, variableTarget: v }))}
+                    id="mod-var-size"
+                  />
+                  <label htmlFor="mod-var-size" className="text-gray-700 text-lg select-none cursor-pointer">Variable Target Size</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={modifiers.adaptiveDifficulty}
+                    onCheckedChange={v => setModifiers(m => ({ ...m, adaptiveDifficulty: v }))}
+                    id="mod-adaptive"
+                  />
+                  <label htmlFor="mod-adaptive" className="text-gray-700 text-lg select-none cursor-pointer">Adaptive Difficulty (target moves after 2s)</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={modifiers.distractors}
+                    onCheckedChange={v => setModifiers(m => ({ ...m, distractors: v }))}
+                    id="mod-distractors"
+                  />
+                  <label htmlFor="mod-distractors" className="text-gray-700 text-lg select-none cursor-pointer">Distractors (flashing violet cells)</label>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
-
         {/* Start Button */}
         <div className="pt-4">
           <Button

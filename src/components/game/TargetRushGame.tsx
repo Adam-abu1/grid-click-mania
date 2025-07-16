@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import GameGrid from './GameGrid';
+import GameGrid from './GameGrid'; // Now resolves to ./GameGrid/index.tsx
 import GameTimer from './GameTimer';
 import ScoreDisplay from './ScoreDisplay';
 import GameStartScreen from './GameStartScreen';
@@ -20,10 +19,11 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
+import { GameModifiersProvider, useGameModifiers } from './GameModifiersContext';
 
 type GameState = 'difficulty' | 'start' | 'playing' | 'finished';
 
-const TargetRushGame = () => {
+const TargetRushGameInner = () => {
   const [gameState, setGameState] = useState<GameState>('difficulty');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [gameDuration, setGameDuration] = useState<GameDuration>(120);
@@ -35,12 +35,39 @@ const TargetRushGame = () => {
   const [activeCell, setActiveCell] = useState(0);
   const [lastCell, setLastCell] = useState(-1);
   const [showScoreAnimation, setShowScoreAnimation] = useState(false);
-  const [variableTarget, setVariableTarget] = useState(false);
   const [targetSize, setTargetSize] = useState<number>(48); // px, default size
   const [paused, setPaused] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<'restart' | 'quit' | null>(null);
   const [wasPausedBeforeDialog, setWasPausedBeforeDialog] = useState(false);
+  const { modifiers } = useGameModifiers();
+  const [adaptiveTimerId, setAdaptiveTimerId] = useState<NodeJS.Timeout | null>(null);
+  const [lastMoveWasTimer, setLastMoveWasTimer] = useState(false);
+  const [distractorCells, setDistractorCells] = useState<number[]>([]);
+  const [distractorsActive, setDistractorsActive] = useState(false);
+
+  // Helper to clear adaptive timer
+  const clearAdaptiveTimer = () => {
+    if (adaptiveTimerId) {
+      clearTimeout(adaptiveTimerId);
+      setAdaptiveTimerId(null);
+    }
+  };
+
+  // Helper to play error sound (same as GameGrid)
+  const playDistractorErrorSound = () => {
+    const audioContext = new (window.AudioContext || (window as Window & typeof globalThis).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.frequency.setValueAtTime(120, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(60, audioContext.currentTime + 0.25);
+    gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.25);
+  };
 
   // Get grid size based on difficulty
   const getGridSize = (diff: Difficulty) => {
@@ -64,20 +91,19 @@ const TargetRushGame = () => {
     
     setLastCell(activeCell);
     setActiveCell(newCell);
-    if (variableTarget) {
+    if (modifiers.variableTarget) {
       // Random size between 32px and 64px
       setTargetSize(32 + Math.floor(Math.random() * 33));
     } else {
       setTargetSize(48);
     }
-  }, [activeCell, lastCell, totalCells, variableTarget]);
+  }, [activeCell, lastCell, totalCells, modifiers.variableTarget]);
 
   // Handle difficulty and duration selection
-  const handleDifficultySelect = (selectedDifficulty: Difficulty, selectedDuration: GameDuration, selectedVariableTarget: boolean) => {
+  const handleDifficultySelect = (selectedDifficulty: Difficulty, selectedDuration: GameDuration) => {
     setDifficulty(selectedDifficulty);
     setGameDuration(selectedDuration);
     setTimeLeft(selectedDuration);
-    setVariableTarget(selectedVariableTarget);
     setGameState('start');
   };
 
@@ -89,14 +115,59 @@ const TargetRushGame = () => {
     setMaxCombo(0);
     setTimeLeft(gameDuration);
     setLastCell(-1);
+    setLastMoveWasTimer(false);
     generateNewCell();
   };
 
-  // Handle cell click
+  // Distractors logic: On new target, show distractors if enabled
+  useEffect(() => {
+    setDistractorCells([]);
+    setDistractorsActive(false);
+    if (
+      gameState === 'playing' &&
+      modifiers.distractors &&
+      !paused &&
+      timeLeft > 0
+    ) {
+      // Pick 1 or 2 distractor cells (not the target)
+      const total = gridSize * gridSize;
+      const available = Array.from({ length: total }, (_, i) => i).filter(i => i !== activeCell);
+      const count = Math.min(2, available.length);
+      const chosen: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const idx = Math.floor(Math.random() * available.length);
+        chosen.push(available[idx]);
+        available.splice(idx, 1);
+      }
+      setDistractorCells(chosen);
+      setDistractorsActive(true);
+      // Hide distractors after 700ms
+      const timeout = setTimeout(() => setDistractorsActive(false), 700);
+      return () => clearTimeout(timeout);
+    }
+    // eslint-disable-next-line
+  }, [activeCell, gameState, modifiers.distractors, paused, timeLeft, gridSize]);
+
+  // Clear distractors on pause or game end
+  useEffect(() => {
+    if (paused || gameState !== 'playing') {
+      setDistractorsActive(false);
+    }
+  }, [paused, gameState]);
+
+  // Enhanced cell click handler for distractors
   const handleCellClick = (cellIndex: number) => {
     if (gameState !== 'playing') return;
-    
+    if (distractorsActive && distractorCells.includes(cellIndex)) {
+      // Penalty for clicking distractor
+      setScore(prev => Math.max(0, prev - 1));
+      playDistractorErrorSound();
+      setCombo(0);
+      return;
+    }
     if (cellIndex === activeCell) {
+      clearAdaptiveTimer();
+      setLastMoveWasTimer(false); // User-initiated move, allow timer to start again
       setScore(prev => {
         // Award bonus for every 5 streak
         const newCombo = combo + 1;
@@ -184,6 +255,34 @@ const TargetRushGame = () => {
     setWasPausedBeforeDialog(false);
   };
 
+  // Adaptive Difficulty: Start timer on new target
+  useEffect(() => {
+    clearAdaptiveTimer();
+    if (
+      gameState === 'playing' &&
+      modifiers.adaptiveDifficulty &&
+      !paused &&
+      timeLeft > 0 &&
+      !lastMoveWasTimer // Only start timer after user-initiated move
+    ) {
+      const id = setTimeout(() => {
+        setLastMoveWasTimer(true); // Mark that the next move is timer-initiated
+        generateNewCell();
+      }, 2000);
+      setAdaptiveTimerId(id);
+      return () => clearTimeout(id);
+    }
+    // eslint-disable-next-line
+  }, [activeCell, gameState, modifiers.adaptiveDifficulty, paused, timeLeft, lastMoveWasTimer]);
+
+  // Clear adaptive timer on unmount or when game is paused/finished
+  useEffect(() => {
+    if (paused || gameState !== 'playing') {
+      clearAdaptiveTimer();
+    }
+    // eslint-disable-next-line
+  }, [paused, gameState]);
+
   // Game timer
   useEffect(() => {
     if (gameState === 'playing' && timeLeft > 0 && !paused) {
@@ -244,8 +343,10 @@ const TargetRushGame = () => {
                       onCellClick={handleCellClick}
                       gameActive={!paused}
                       gridSize={gridSize}
-                      variableTarget={variableTarget}
+                      variableTarget={modifiers.variableTarget}
                       targetSize={targetSize}
+                      distractorCells={distractorCells}
+                      distractorsActive={distractorsActive}
                     />
                     {paused && (
                       <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-20 rounded-2xl">
@@ -308,5 +409,11 @@ const TargetRushGame = () => {
     </div>
   );
 };
+
+const TargetRushGame = () => (
+  <GameModifiersProvider>
+    <TargetRushGameInner />
+  </GameModifiersProvider>
+);
 
 export default TargetRushGame;

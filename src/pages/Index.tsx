@@ -1,5 +1,5 @@
 
-import TargetRushGame from "@/components/TargetRushGame";
+import TargetRushGame from "@/components/game/TargetRushGame";
 
 const Index = () => {
   return <TargetRushGame />;
