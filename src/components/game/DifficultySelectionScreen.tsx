@@ -10,7 +10,7 @@ export type Difficulty = 'easy' | 'medium' | 'hard';
 export type GameDuration = 30 | 60 | 120;
 
 interface DifficultySelectionScreenProps {
-  onSelect: (difficulty: Difficulty, duration: GameDuration, variableTarget: boolean) => void;
+  onSelect: (difficulty: Difficulty, duration: GameDuration) => void;
 }
 
 const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps) => {
@@ -55,7 +55,7 @@ const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps)
 
   const handleStart = () => {
     if (selectedDifficulty && selectedDuration) {
-      onSelect(selectedDifficulty, selectedDuration, modifiers.variableTarget);
+      onSelect(selectedDifficulty, selectedDuration);
     }
   };
 
@@ -160,7 +160,7 @@ const DifficultySelectionScreen = ({ onSelect }: DifficultySelectionScreenProps)
                     onCheckedChange={v => setModifiers(m => ({ ...m, adaptiveDifficulty: v }))}
                     id="mod-adaptive"
                   />
-                  <label htmlFor="mod-adaptive" className="text-gray-700 text-lg select-none cursor-pointer">Adaptive Difficulty (target moves after 2s)</label>
+                  <label htmlFor="mod-adaptive" className="text-gray-700 text-lg select-none cursor-pointer">Adaptive Difficulty (target auto-moves after 3s)</label>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch

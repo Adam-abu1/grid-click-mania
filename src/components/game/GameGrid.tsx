@@ -77,17 +77,35 @@ const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize, variableTarge
     setFeedbackType(null);
   }, [activeCell]);
 
-  const getGridSizeClass = () => {
+  const getGridClasses = () => {
     switch (gridSize) {
-      case 3: return 'grid-cols-3 max-w-md';
-      case 4: return 'grid-cols-4 max-w-lg';
-      case 5: return 'grid-cols-5 max-w-xl';
-      default: return 'grid-cols-3 max-w-md';
+      case 3: return {
+        grid: 'grid-cols-3',
+        container: 'w-[360px] max-w-[90vw]',
+        gap: 'gap-4'
+      };
+      case 4: return {
+        grid: 'grid-cols-4',
+        container: 'w-[480px] max-w-[90vw]',
+        gap: 'gap-3'
+      };
+      case 5: return {
+        grid: 'grid-cols-5',
+        container: 'w-[600px] max-w-[90vw]',
+        gap: 'gap-2'
+      };
+      default: return {
+        grid: 'grid-cols-3',
+        container: 'w-[360px] max-w-[90vw]',
+        gap: 'gap-4'
+      };
     }
   };
 
+  const gridClasses = getGridClasses();
+
   return (
-    <div className={`grid gap-3 mx-auto ${getGridSizeClass()}`}>
+    <div className={`grid ${gridClasses.grid} ${gridClasses.gap} ${gridClasses.container} mx-auto`}>
       {cells.map((cellIndex) => {
         const isDistractor = distractorsActive && distractorCells.includes(cellIndex);
         return (
@@ -96,9 +114,13 @@ const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize, variableTarge
             onClick={() => handleCellClick(cellIndex)}
             disabled={!gameActive}
             className={cn(
-              "aspect-square w-full h-full min-w-[110px] min-h-[110px] md:min-w-[140px] md:min-h-[140px] rounded-2xl border-4 transition-all duration-200 transform flex items-center justify-center",
+              "aspect-square w-full h-full rounded-2xl border-4 transition-all duration-200 transform flex items-center justify-center",
               "hover:scale-105 active:scale-95",
               "text-2xl font-bold shadow-lg",
+              // Dynamic sizing based on grid size
+              gridSize === 3 ? "min-w-[100px] min-h-[100px] sm:min-w-[110px] sm:min-h-[110px]" :
+              gridSize === 4 ? "min-w-[90px] min-h-[90px] sm:min-w-[100px] sm:min-h-[100px]" :
+              "min-w-[80px] min-h-[80px] sm:min-w-[90px] sm:min-h-[90px]",
               // Base styling
               activeCell === cellIndex 
                 ? "bg-gradient-to-br from-yellow-400 to-orange-500 border-orange-600 text-white animate-pulse shadow-xl scale-110" 
@@ -113,8 +135,13 @@ const GameGrid = ({ activeCell, onCellClick, gameActive, gridSize, variableTarge
           >
             {activeCell === cellIndex && (
               <span
-                className="block mx-auto"
-                style={variableTarget ? { fontSize: `${targetSize * 0.7}px`, transition: 'font-size 0.2s' } : {}}
+                className="block mx-auto transition-all duration-300 ease-in-out"
+                style={variableTarget ? { 
+                  fontSize: `${Math.max(16, targetSize * 0.8)}px`,
+                  transform: targetSize < 30 ? 'scale(1.2)' : targetSize > 70 ? 'scale(0.8)' : 'scale(1)',
+                  filter: targetSize < 30 ? 'brightness(1.3) drop-shadow(0 0 8px rgba(255, 255, 0, 0.8))' : 
+                          targetSize > 70 ? 'brightness(0.9)' : 'none'
+                } : {}}
               >
                 🎯
               </span>
