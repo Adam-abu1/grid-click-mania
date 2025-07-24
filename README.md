@@ -205,6 +205,7 @@ This project is built with:
 
 - ~~The grid is not perfectly centered on the page, only within its flex column.~~ ✅ Fixed
 - ~~The timer/progress bar shrinks on larger screens.~~ ✅ Fixed
-- ~~The variable target sizing feature does not feel visually impactful or as intended.~~ ✅ Fixed
+- The variable target sizing feature does not feel visually impactful or as intended.
 - ~~The grid and score area alignment is not pixel-perfect with the timer and controls.~~ ✅ Fixed
 - ~~The grid does not always use available screen space optimally.~~ ✅ Fixed
+- ~~The adaptive difficulty modifier auto-switch only activates when player score is above 60, instead of working from the start of the game.~~ ✅ Fixed

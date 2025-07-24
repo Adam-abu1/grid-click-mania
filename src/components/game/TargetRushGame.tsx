@@ -290,15 +290,16 @@ const TargetRushGameInner = () => {
 
   // Adaptive Difficulty: Start timer on new target
   useEffect(() => {
+    // Always clear any existing timer first
     clearAdaptiveTimer();
     setAdaptiveCountdown(null);
     
+    // Only start timer if adaptive difficulty is enabled and game is active
     if (
       gameState === 'playing' &&
       modifiers.adaptiveDifficulty &&
       !paused &&
-      timeLeft > 0 &&
-      !lastMoveWasTimer // Only start timer after user-initiated move
+      timeLeft > 0
     ) {
       const currentSpeed = Math.max(1000, adaptiveSpeed - adaptiveSpeedIncrement);
       const startTime = Date.now();
@@ -315,34 +316,28 @@ const TargetRushGameInner = () => {
         }
       }, 100);
       
+      // Set timeout for auto-move
       const id = setTimeout(() => {
         clearInterval(countdownInterval);
         setAdaptiveCountdown(null);
-        setLastMoveWasTimer(true); // Mark that the next move is timer-initiated
         // Penalize for missing the auto-move
         setScore(prev => Math.max(0, prev - 1));
         setCombo(0);
+        // Generate new cell which will trigger this effect again
         generateNewCell();
       }, currentSpeed);
       
       setAdaptiveTimerId(id);
+      
+      // Cleanup function
       return () => {
         clearTimeout(id);
         clearInterval(countdownInterval);
       };
     }
-    // eslint-disable-next-line
-  }, [activeCell, gameState, modifiers.adaptiveDifficulty, paused, timeLeft, lastMoveWasTimer, adaptiveSpeed, adaptiveSpeedIncrement]);
+  }, [activeCell, gameState, modifiers.adaptiveDifficulty, paused, timeLeft, adaptiveSpeed, adaptiveSpeedIncrement, generateNewCell]);
 
-  // Reset lastMoveWasTimer after auto-move to allow timer to restart
-  useEffect(() => {
-    if (lastMoveWasTimer && gameState === 'playing' && !paused) {
-      const resetTimer = setTimeout(() => {
-        setLastMoveWasTimer(false);
-      }, 100); // Small delay to ensure cell generation is complete
-      return () => clearTimeout(resetTimer);
-    }
-  }, [lastMoveWasTimer, gameState, paused, activeCell]);
+
 
   // Clear adaptive timer on unmount or when game is paused/finished
   useEffect(() => {
