@@ -203,8 +203,8 @@ This project is built with:
 
 ## Current Bugs & UI Issues
 
-- The grid is not perfectly centered on the page, only within its flex column.
-- The timer/progress bar shrinks on larger screens.
-- The variable target sizing feature does not feel visually impactful or as intended.
-- The grid and score area alignment is not pixel-perfect with the timer and controls.
-- The grid does not always use available screen space optimally.
+- ~~The grid is not perfectly centered on the page, only within its flex column.~~ ✅ Fixed
+- ~~The timer/progress bar shrinks on larger screens.~~ ✅ Fixed
+- ~~The variable target sizing feature does not feel visually impactful or as intended.~~ ✅ Fixed
+- ~~The grid and score area alignment is not pixel-perfect with the timer and controls.~~ ✅ Fixed
+- ~~The grid does not always use available screen space optimally.~~ ✅ Fixed

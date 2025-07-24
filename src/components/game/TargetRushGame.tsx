@@ -334,6 +334,16 @@ const TargetRushGameInner = () => {
     // eslint-disable-next-line
   }, [activeCell, gameState, modifiers.adaptiveDifficulty, paused, timeLeft, lastMoveWasTimer, adaptiveSpeed, adaptiveSpeedIncrement]);
 
+  // Reset lastMoveWasTimer after auto-move to allow timer to restart
+  useEffect(() => {
+    if (lastMoveWasTimer && gameState === 'playing' && !paused) {
+      const resetTimer = setTimeout(() => {
+        setLastMoveWasTimer(false);
+      }, 100); // Small delay to ensure cell generation is complete
+      return () => clearTimeout(resetTimer);
+    }
+  }, [lastMoveWasTimer, gameState, paused, activeCell]);
+
   // Clear adaptive timer on unmount or when game is paused/finished
   useEffect(() => {
     if (paused || gameState !== 'playing') {
