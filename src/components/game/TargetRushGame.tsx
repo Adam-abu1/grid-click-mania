@@ -43,6 +43,9 @@ const TargetRushGameInner = () => {
   const { modifiers } = useGameModifiers();
   const [adaptiveTimerId, setAdaptiveTimerId] = useState<NodeJS.Timeout | null>(null);
   const [lastMoveWasTimer, setLastMoveWasTimer] = useState(false);
+  const [adaptiveSpeed, setAdaptiveSpeed] = useState(3000); // Start at 3 seconds
+  const [adaptiveSpeedIncrement, setAdaptiveSpeedIncrement] = useState(0);
+  const [adaptiveCountdown, setAdaptiveCountdown] = useState<number | null>(null);
   const [distractorCells, setDistractorCells] = useState<number[]>([]);
   const [distractorsActive, setDistractorsActive] = useState(false);
 
@@ -52,6 +55,7 @@ const TargetRushGameInner = () => {
       clearTimeout(adaptiveTimerId);
       setAdaptiveTimerId(null);
     }
+    setAdaptiveCountdown(null);
   };
 
   // Helper to play error sound (same as GameGrid)
@@ -92,8 +96,20 @@ const TargetRushGameInner = () => {
     setLastCell(activeCell);
     setActiveCell(newCell);
     if (modifiers.variableTarget) {
-      // Random size between 32px and 64px
-      setTargetSize(32 + Math.floor(Math.random() * 33));
+      // More impactful size variation: 20px to 80px with weighted distribution
+      const rand = Math.random();
+      let size;
+      if (rand < 0.2) {
+        // 20% chance for very small (challenging)
+        size = 20 + Math.floor(Math.random() * 15); // 20-34px
+      } else if (rand < 0.4) {
+        // 20% chance for very large (easy)
+        size = 65 + Math.floor(Math.random() * 16); // 65-80px
+      } else {
+        // 60% chance for medium sizes
+        size = 35 + Math.floor(Math.random() * 30); // 35-64px
+      }
+      setTargetSize(size);
     } else {
       setTargetSize(48);
     }
@@ -116,6 +132,8 @@ const TargetRushGameInner = () => {
     setTimeLeft(gameDuration);
     setLastCell(-1);
     setLastMoveWasTimer(false);
+    setAdaptiveSpeed(3000); // Reset adaptive speed
+    setAdaptiveSpeedIncrement(0);
     generateNewCell();
   };
 
@@ -168,6 +186,13 @@ const TargetRushGameInner = () => {
     if (cellIndex === activeCell) {
       clearAdaptiveTimer();
       setLastMoveWasTimer(false); // User-initiated move, allow timer to start again
+      
+      // Increase adaptive difficulty every 10 successful hits
+      if (modifiers.adaptiveDifficulty && (score + 1) % 10 === 0) {
+        setAdaptiveSpeedIncrement(prev => prev + 200); // Reduce time by 200ms every 10 hits
+        const newSpeed = Math.max(1000, adaptiveSpeed - 200); // Minimum 1 second
+        setAdaptiveSpeed(newSpeed);
+      }
       setScore(prev => {
         // Award bonus for every 5 streak
         const newCombo = combo + 1;
@@ -201,6 +226,8 @@ const TargetRushGameInner = () => {
     setActiveCell(0);
     setLastCell(-1);
     setPaused(false);
+    setAdaptiveSpeed(3000);
+    setAdaptiveSpeedIncrement(0);
     startGame();
   };
 
@@ -214,6 +241,9 @@ const TargetRushGameInner = () => {
     setActiveCell(0);
     setLastCell(-1);
     setPaused(false);
+    setAdaptiveSpeed(3000);
+    setAdaptiveSpeedIncrement(0);
+    clearAdaptiveTimer();
   };
 
   // Reset to difficulty selection
@@ -226,6 +256,9 @@ const TargetRushGameInner = () => {
     setActiveCell(0);
     setLastCell(-1);
     setPaused(false);
+    setAdaptiveSpeed(3000);
+    setAdaptiveSpeedIncrement(0);
+    clearAdaptiveTimer();
   };
 
   // Intercepted handlers
@@ -257,23 +290,54 @@ const TargetRushGameInner = () => {
 
   // Adaptive Difficulty: Start timer on new target
   useEffect(() => {
+    // Always clear any existing timer first
     clearAdaptiveTimer();
+    setAdaptiveCountdown(null);
+    
+    // Only start timer if adaptive difficulty is enabled and game is active
     if (
       gameState === 'playing' &&
       modifiers.adaptiveDifficulty &&
       !paused &&
-      timeLeft > 0 &&
-      !lastMoveWasTimer // Only start timer after user-initiated move
+      timeLeft > 0
     ) {
+      const currentSpeed = Math.max(1000, adaptiveSpeed - adaptiveSpeedIncrement);
+      const startTime = Date.now();
+      
+      // Update countdown every 100ms
+      const countdownInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, currentSpeed - elapsed);
+        setAdaptiveCountdown(Math.ceil(remaining / 1000));
+        
+        if (remaining <= 0) {
+          clearInterval(countdownInterval);
+          setAdaptiveCountdown(null);
+        }
+      }, 100);
+      
+      // Set timeout for auto-move
       const id = setTimeout(() => {
-        setLastMoveWasTimer(true); // Mark that the next move is timer-initiated
+        clearInterval(countdownInterval);
+        setAdaptiveCountdown(null);
+        // Penalize for missing the auto-move
+        setScore(prev => Math.max(0, prev - 1));
+        setCombo(0);
+        // Generate new cell which will trigger this effect again
         generateNewCell();
-      }, 2000);
+      }, currentSpeed);
+      
       setAdaptiveTimerId(id);
-      return () => clearTimeout(id);
+      
+      // Cleanup function
+      return () => {
+        clearTimeout(id);
+        clearInterval(countdownInterval);
+      };
     }
-    // eslint-disable-next-line
-  }, [activeCell, gameState, modifiers.adaptiveDifficulty, paused, timeLeft, lastMoveWasTimer]);
+  }, [activeCell, gameState, modifiers.adaptiveDifficulty, paused, timeLeft, adaptiveSpeed, adaptiveSpeedIncrement, generateNewCell]);
+
+
 
   // Clear adaptive timer on unmount or when game is paused/finished
   useEffect(() => {
@@ -296,20 +360,24 @@ const TargetRushGameInner = () => {
   }, [gameState, timeLeft, paused]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-100 via-sky-50 to-emerald-50 p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-violet-100 via-sky-50 to-emerald-50 p-4 relative overflow-hidden flex items-center justify-center">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-4 -left-4 w-72 h-72 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full opacity-20 animate-pulse"></div>
         <div className="absolute top-1/3 -right-16 w-96 h-96 bg-gradient-to-r from-pink-300 to-orange-300 rounded-full opacity-15 animate-pulse" style={{ animationDelay: '1s' }}></div>
         <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-teal-300 rounded-full opacity-20 animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="w-full max-w-7xl mx-auto relative z-10">
         {gameState === 'difficulty' && (
-          <DifficultySelectionScreen onSelect={handleDifficultySelect} />
+          <div className="flex items-center justify-center min-h-[80vh]">
+            <DifficultySelectionScreen onSelect={handleDifficultySelect} />
+          </div>
         )}
         
         {gameState === 'start' && (
-          <GameStartScreen onStart={startGame} />
+          <div className="flex items-center justify-center min-h-[80vh]">
+            <GameStartScreen onStart={startGame} />
+          </div>
         )}
         
         {gameState === 'playing' && (
@@ -333,53 +401,80 @@ const TargetRushGameInner = () => {
               </AlertDialogContent>
             </AlertDialog>
             <div className="flex flex-col items-center w-full">
-              <GameTimer timeLeft={timeLeft} totalTime={gameDuration} />
-              <div className="flex flex-row justify-center items-start w-full max-w-4xl mx-auto">
-                <div className="flex-1 flex flex-col items-center relative">
-                  <ScoreDisplay score={score} showAnimation={showScoreAnimation} />
-                  <div className="relative w-full">
-                    <GameGrid 
-                      activeCell={activeCell}
-                      onCellClick={handleCellClick}
-                      gameActive={!paused}
-                      gridSize={gridSize}
-                      variableTarget={modifiers.variableTarget}
-                      targetSize={targetSize}
-                      distractorCells={distractorCells}
-                      distractorsActive={distractorsActive}
-                    />
-                    {paused && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-20 rounded-2xl">
-                        <span className="text-4xl font-bold text-gray-700">Paused</span>
-                      </div>
-                    )}
+              <div className="w-full max-w-6xl mx-auto px-4">
+                <GameTimer timeLeft={timeLeft} totalTime={gameDuration} />
+                
+                {/* Main game area with responsive layout */}
+                <div className="flex flex-col lg:flex-row justify-center items-start gap-8 mt-8">
+                  {/* Left side - Score */}
+                  <div className="flex flex-col items-center lg:items-end lg:w-48 order-1 lg:order-1">
+                    <ScoreDisplay score={score} showAnimation={showScoreAnimation} />
                   </div>
-                </div>
-                <div className="flex flex-col items-start" style={{ width: '200px', minWidth: '160px', maxWidth: '220px' }}>
-                  {/* Combo/Streak Counter */}
-                  <div style={{ minHeight: '2.5rem' }} className="w-full">
-                    {combo > 1 ? (
-                      <div className="text-xl font-bold text-yellow-500 animate-pulse text-right w-full">Combo x{combo}</div>
-                    ) : (
-                      <div className="invisible text-xl font-bold text-right w-full">Combo x0</div>
-                    )}
+                  
+                  {/* Center - Game Grid */}
+                  <div className="flex-shrink-0 order-2 lg:order-2">
+                    <div className="relative">
+                      <GameGrid 
+                        activeCell={activeCell}
+                        onCellClick={handleCellClick}
+                        gameActive={!paused}
+                        gridSize={gridSize}
+                        variableTarget={modifiers.variableTarget}
+                        targetSize={targetSize}
+                        distractorCells={distractorCells}
+                        distractorsActive={distractorsActive}
+                      />
+                      {paused && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-20 rounded-2xl">
+                          <span className="text-4xl font-bold text-gray-700">Paused</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {/* Bonus Message */}
-                  <div style={{ minHeight: '2.5rem' }} className="w-full">
-                    {bonusMessage ? (
-                      <div className="text-lg font-bold text-orange-500 animate-bounce text-right w-full">{bonusMessage}</div>
-                    ) : (
-                      <div className="invisible text-lg font-bold text-right w-full">Bonus</div>
-                    )}
-                  </div>
-                  {/* Max Combo */}
-                  <div style={{ minHeight: '1.5rem' }} className="w-full">
-                    {maxCombo > 1 ? (
-                      <div className="text-sm text-gray-500 text-right w-full">Max Combo: {maxCombo}</div>
-                    ) : (
-                      <div className="invisible text-sm text-right w-full">Max Combo: 0</div>
-                    )}
-                  </div>
+                  
+                                     {/* Right side - Combo/Bonus Area */}
+                   <div className="flex flex-col items-center lg:items-start lg:w-48 order-3 lg:order-3">
+                     {/* Adaptive Countdown */}
+                     <div className="min-h-[2.5rem] w-full">
+                       {modifiers.adaptiveDifficulty && adaptiveCountdown !== null && adaptiveCountdown > 0 ? (
+                         <div className="text-lg font-bold text-red-500 animate-pulse text-center lg:text-left w-full">
+                           Auto-move in {adaptiveCountdown}s
+                         </div>
+                       ) : (
+                         <div className="invisible text-lg font-bold text-center lg:text-left w-full">Auto-move</div>
+                       )}
+                     </div>
+                     {/* Combo/Streak Counter */}
+                     <div className="min-h-[2.5rem] w-full">
+                       {combo > 1 ? (
+                         <div className="text-xl font-bold text-yellow-500 animate-pulse text-center lg:text-left w-full">
+                           Combo x{combo}
+                         </div>
+                       ) : (
+                         <div className="invisible text-xl font-bold text-center lg:text-left w-full">Combo x0</div>
+                       )}
+                     </div>
+                     {/* Bonus Message */}
+                     <div className="min-h-[2.5rem] w-full">
+                       {bonusMessage ? (
+                         <div className="text-lg font-bold text-orange-500 animate-bounce text-center lg:text-left w-full">
+                           {bonusMessage}
+                         </div>
+                       ) : (
+                         <div className="invisible text-lg font-bold text-center lg:text-left w-full">Bonus</div>
+                       )}
+                     </div>
+                     {/* Max Combo */}
+                     <div className="min-h-[1.5rem] w-full">
+                       {maxCombo > 1 ? (
+                         <div className="text-sm text-gray-500 text-center lg:text-left w-full">
+                           Max Combo: {maxCombo}
+                         </div>
+                       ) : (
+                         <div className="invisible text-sm text-center lg:text-left w-full">Max Combo: 0</div>
+                       )}
+                     </div>
+                   </div>
                 </div>
               </div>
               <div className="flex justify-center space-x-4 mt-6">
@@ -397,13 +492,20 @@ const TargetRushGameInner = () => {
               </div>
               <div className="text-sm text-gray-500 mt-1">
                 Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} ({gridSize}×{gridSize}) • Duration: {gameDuration}s
+                {modifiers.adaptiveDifficulty && (
+                  <span className="ml-2 text-red-600 font-medium">
+                    • Adaptive Speed: {Math.max(1, Math.round((adaptiveSpeed - adaptiveSpeedIncrement) / 1000))}s
+                  </span>
+                )}
               </div>
             </div>
           </>
         )}
         
         {gameState === 'finished' && (
-          <GameResultScreen score={score} onRestart={resetToStart} />
+          <div className="flex items-center justify-center min-h-[80vh]">
+            <GameResultScreen score={score} onRestart={resetToStart} />
+          </div>
         )}
       </div>
     </div>

@@ -12,7 +12,7 @@ const MODIFIERS = [
   {
     key: 'adaptiveDifficulty',
     label: 'Adaptive Difficulty',
-    description: 'Target moves automatically if not clicked in 2 seconds.',
+    description: 'Target auto-moves after 3s (speed increases every 10 hits).',
     id: 'mod-adaptive',
   },
   {
